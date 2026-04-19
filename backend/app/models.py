@@ -1,0 +1,80 @@
+from datetime import datetime
+
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.database import Base
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    hashed_password: Mapped[str] = mapped_column(String(255))
+    role: Mapped[str] = mapped_column(String(50), default="user")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    research_sessions: Mapped[list["ResearchSession"]] = relationship(back_populates="user")
+
+
+class ResearchSession(Base):
+    __tablename__ = "research_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    query: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(50), default="completed")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped[User] = relationship(back_populates="research_sessions")
+    sources: Mapped[list["Source"]] = relationship(back_populates="research_session")
+    summary: Mapped["Summary"] = relationship(back_populates="research_session", uselist=False)
+    citations: Mapped[list["Citation"]] = relationship(back_populates="research_session")
+    memory_entries: Mapped[list["Memory"]] = relationship(back_populates="research_session")
+
+
+class Source(Base):
+    __tablename__ = "sources"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    research_id: Mapped[int] = mapped_column(ForeignKey("research_sessions.id"), index=True)
+    title: Mapped[str] = mapped_column(String(500))
+    url: Mapped[str] = mapped_column(String(2048))
+    content: Mapped[str] = mapped_column(Text)
+
+    research_session: Mapped[ResearchSession] = relationship(back_populates="sources")
+
+
+class Summary(Base):
+    __tablename__ = "summaries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    research_id: Mapped[int] = mapped_column(ForeignKey("research_sessions.id"), unique=True)
+    content: Mapped[str] = mapped_column(Text)
+
+    research_session: Mapped[ResearchSession] = relationship(back_populates="summary")
+
+
+class Citation(Base):
+    __tablename__ = "citations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    research_id: Mapped[int] = mapped_column(ForeignKey("research_sessions.id"), index=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey("sources.id"), index=True)
+    marker: Mapped[str] = mapped_column(String(32))
+    excerpt: Mapped[str] = mapped_column(Text)
+
+    research_session: Mapped[ResearchSession] = relationship(back_populates="citations")
+
+
+class Memory(Base):
+    __tablename__ = "memory"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    research_id: Mapped[int] = mapped_column(ForeignKey("research_sessions.id"), index=True)
+    chunk: Mapped[str] = mapped_column(Text)
+    source_url: Mapped[str] = mapped_column(String(2048))
+    score: Mapped[float] = mapped_column(Float, default=0.0)
+
+    research_session: Mapped[ResearchSession] = relationship(back_populates="memory_entries")
