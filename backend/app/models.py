@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -13,7 +13,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(50), default="user")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
     research_sessions: Mapped[list["ResearchSession"]] = relationship(back_populates="user")
 
@@ -25,7 +25,7 @@ class ResearchSession(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     query: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(50), default="completed")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
     user: Mapped[User] = relationship(back_populates="research_sessions")
     sources: Mapped[list["Source"]] = relationship(back_populates="research_session")
