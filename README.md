@@ -1,71 +1,61 @@
-# Astra AI Monorepo Scaffold
+# Astra AI
 
-Production-style starter scaffold for an autonomous research agent.
+Autonomous AI research agent monorepo with a FastAPI backend and React frontend.
 
-## Stack
-- FastAPI backend
-- React frontend (Vite)
-- PostgreSQL
-- LangChain / LangGraph integration seams
-- FAISS dependency and memory integration hooks
-- Docker Compose + GitHub Actions CI
+## Repository structure
+- `/backend` - FastAPI API, research pipeline, models, auth, and tests
+- `/frontend` - React + Vite + Tailwind UI
+- `/docs` - architecture notes
 
-## Repository Layout
-```
-backend/        # FastAPI app (agents/tools/validators/routers/services/models)
-frontend/       # React UI (layout + pages)
-docs/           # Architecture/API docs
-.github/        # CI workflow
-```
-
-## Implemented Research Pipeline
-1. Query submission via `POST /api/v1/research`
-2. Planner agent generates search facets
-3. Web search tool gathers candidate sources
-4. Scraper extracts page content
-5. Validation layer scores credibility and relevance
-6. Summarizer agent synthesizes cited output
-7. Citation linker maps ranked sources to `[n]` references
-
-## API Endpoints
+## MVP capabilities
+### Backend API
 - `GET /health`
-- `POST /api/v1/research`
-- `GET /api/v1/research`
-- `GET /api/v1/research/{run_id}`
-- `GET /api/v1/sources`
-- `POST /api/v1/memory`
-- `GET /api/v1/memory`
+- `POST /api/auth/login`
+- `POST /api/research`
+- `GET /api/research`
+- `GET /api/research/{id}`
+- `GET /api/sources/{research_id}`
+- `GET /api/memory/{research_id}`
 
-## Local Development
-### 1) Install dependencies
+### Research pipeline
+- Planner agent
+- Search tool
+- Scraping/extraction with `requests` + `BeautifulSoup`
+- Validation layer
+- Summarization agent
+- Citation generation
+- FAISS memory persistence
+
+### Frontend pages
+- Login
+- Dashboard
+- Research Query
+- Research Results
+- Source Viewer
+- Settings
+
+## Run locally
+### Backend
 ```bash
-make install-backend
-make install-frontend
+cd backend
+pip install -e .[dev]
+uvicorn app.main:app --reload
 ```
 
-### 2) Run services locally
+### Frontend
 ```bash
-make dev-backend
-make dev-frontend
+cd frontend
+npm install
+npm run dev
 ```
 
-### 3) Run with Docker
+### Full stack
 ```bash
-make up
+docker-compose up --build
 ```
 
-### 4) Run CI-equivalent checks
+## Quality checks
 ```bash
-make ci
+make lint
+make test
 ```
-
-## Testing
-```bash
-cd backend && python -m pytest
-```
-
-## Next Build Steps
-- Integrate LangGraph stateful planning/execution graph and LLM summarization calls.
-- Add vector embeddings and FAISS-backed memory retrieval flow.
-- Introduce Alembic migrations and repository interfaces for all entities.
-- Build frontend result visualization with inline citation drill-down.

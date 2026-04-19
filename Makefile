@@ -1,23 +1,16 @@
-.PHONY: install-backend install-frontend dev-backend dev-frontend up down ci
+.PHONY: backend-install frontend-install lint test
 
-install-backend:
-	cd backend && pip install -r requirements.txt
+backend-install:
+	cd backend && pip install -e .[dev]
 
-install-frontend:
+frontend-install:
 	cd frontend && npm install
 
-dev-backend:
-	cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+lint:
+	cd backend && ruff check app tests
+	cd frontend && npm run lint
+	cd frontend && npm run format:check
 
-dev-frontend:
-	cd frontend && npm run dev
-
-up:
-	docker compose up --build
-
-down:
-	docker compose down -v
-
-ci:
-	cd backend && python -m compileall app
+test:
+	cd backend && pytest
 	cd frontend && npm run build

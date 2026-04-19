@@ -1,35 +1,35 @@
 version: "3.9"
 
 services:
-  db:
+  postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: astra
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: astra
+      POSTGRES_PASSWORD: astra
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
 
   backend:
     build: ./backend
     environment:
-      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/astra
-      ENVIRONMENT: development
+      ASTRA_DATABASE_URL: postgresql+psycopg://astra:astra@postgres:5432/astra
+      ASTRA_JWT_SECRET: local-dev-secret
+    depends_on:
+      - postgres
     ports:
       - "8000:8000"
-    depends_on:
-      - db
 
   frontend:
     build: ./frontend
     environment:
-      VITE_API_BASE: http://localhost:8000/api/v1
-    ports:
-      - "5173:5173"
+      VITE_API_BASE: http://localhost:8000
     depends_on:
       - backend
+    ports:
+      - "5173:5173"
 
 volumes:
-  postgres_data:
+  pgdata:

@@ -1,130 +1,91 @@
-import logging
-
 from sqlalchemy.orm import Session
 
-from app.agents.planner_agent import PlannerAgent
-from app.agents.summarizer_agent import SummarizerAgent
-from app.repositories.research_repository import ResearchRepository
-from app.schemas.research import CitationItem, ResearchListResponse, ResearchRequest, ResearchResponse, ResearchSourceRead
-from app.tools.scraper_tool import ScraperTool
-from app.tools.web_search_tool import WebSearchTool
-from app.utils.citations import build_citations
-from app.validators.source_validator import SourceValidator
-
-logger = logging.getLogger(__name__)
+from app.models import Citation, Memory, ResearchSession, Source, Summary
+from app.services.citations import CitationSystem
+from app.services.memory_store import MemoryStore
+from app.services.planner import PlannerAgent
+from app.services.scraper import Scraper
+from app.services.search import SearchTool
+from app.services.summarizer import SummarizationAgent
+from app.services.validator import ValidationLayer
 
 
 class ResearchService:
-    """Coordinates planner, search, scraping, validation, and summarization."""
+    def __init__(self) -> None:
+        self.planner = PlannerAgent()
+        self.search_tool = SearchTool()
+        self.scraper = Scraper()
+        self.validator = ValidationLayer()
+        self.summarizer = SummarizationAgent()
+        self.citation_system = CitationSystem()
+        self.memory = MemoryStore()
 
-    def __init__(
+    def run(
         self,
-        planner: PlannerAgent | None = None,
-        search_tool: WebSearchTool | None = None,
-        scraper: ScraperTool | None = None,
-        validator: SourceValidator | None = None,
-        summarizer: SummarizerAgent | None = None,
-        repository: ResearchRepository | None = None,
-    ) -> None:
-        self.planner = planner or PlannerAgent()
-        self.search_tool = search_tool or WebSearchTool()
-        self.scraper = scraper or ScraperTool()
-        self.validator = validator or SourceValidator()
-        self.summarizer = summarizer or SummarizerAgent()
-        self.repository = repository or ResearchRepository()
+        db: Session,
+        user_id: int,
+        query: str,
+    ) -> tuple[ResearchSession, Summary, list[Citation]]:
+        research = ResearchSession(user_id=user_id, query=query, status="processing")
+        db.add(research)
+        db.flush()
 
-    async def run_research(self, db: Session, payload: ResearchRequest) -> ResearchResponse:
-        logger.info("research.start", extra={"query": payload.query})
-        planned_queries = self.planner.plan_queries(payload.query)
-
-        collected: list[dict] = []
-        for planned in planned_queries:
-            search_results = await self.search_tool.search(planned, max_results=payload.max_sources)
-            for result in search_results:
-                if any(existing["url"] == result["url"] for existing in collected):
+        source_payloads: list[dict[str, str]] = []
+        for step in self.planner.plan(query):
+            try:
+                urls = self.search_tool.search(step)
+            except Exception:
+                continue
+            for url in urls:
+                try:
+                    title, content = self.scraper.extract(url)
+                except Exception:
                     continue
-                content = await self.scraper.extract(result["url"])
-                result["content"] = content
-                result["relevance_score"] = min(len(result["snippet"]) / 240, 1.0)
-                result["credibility_score"] = self.validator.score(result["url"], content)
-                collected.append(result)
-                if len(collected) >= payload.max_sources:
-                    break
-            if len(collected) >= payload.max_sources:
-                break
+                source_payloads.append({"title": title, "url": url, "content": content})
 
-        ranked = sorted(
-            collected,
-            key=lambda item: (item["credibility_score"] + item["relevance_score"]),
-            reverse=True,
-        )
+        validated_sources = self.validator.filter_sources(source_payloads)[:5]
+        source_rows: list[Source] = []
+        for source_payload in validated_sources:
+            row = Source(research_id=research.id, **source_payload)
+            db.add(row)
+            source_rows.append(row)
+            self.memory.add_chunks(
+                [source_payload["content"][:500]],
+                research.id,
+                source_payload["url"],
+            )
+            db.add(
+                Memory(
+                    research_id=research.id,
+                    chunk=source_payload["content"][:500],
+                    source_url=source_payload["url"],
+                    score=1.0,
+                )
+            )
 
-        summary = self.summarizer.summarize(payload.query, ranked)
+        summary_text = self.summarizer.summarize(query, validated_sources)
+        summary = Summary(research_id=research.id, content=summary_text)
+        db.add(summary)
 
-        run = self.repository.create_run(db, query=payload.query, summary=summary)
-        self.repository.add_sources(db, run, ranked)
+        citation_rows: list[Citation] = []
+        citation_payloads = self.citation_system.build(validated_sources)
+        for citation_payload in citation_payloads:
+            source_index = int(citation_payload["source_index"])
+            if source_index >= len(source_rows):
+                continue
+            citation = Citation(
+                research_id=research.id,
+                source_id=source_rows[source_index].id,
+                marker=str(citation_payload["marker"]),
+                excerpt=str(citation_payload["excerpt"]),
+            )
+            db.add(citation)
+            citation_rows.append(citation)
+
+        research.status = "completed"
         db.commit()
-        db.refresh(run)
-
-        citations = [CitationItem(**item) for item in build_citations(ranked)]
-        response_sources = [
-            ResearchSourceRead(
-                title=src["title"],
-                url=src["url"],
-                snippet=src["snippet"],
-                relevance_score=src["relevance_score"],
-                credibility_score=src["credibility_score"],
-            )
-            for src in ranked
-        ]
-
-        return ResearchResponse(
-            id=run.id,
-            query=run.query,
-            summary=run.summary,
-            citations=citations,
-            sources=response_sources,
-            created_at=run.created_at,
-        )
-
-    def list_research_runs(self, db: Session) -> list[ResearchListResponse]:
-        runs = self.repository.list_runs(db)
-        return [
-            ResearchListResponse(
-                id=run.id,
-                query=run.query,
-                status=run.status,
-                created_at=run.created_at,
-            )
-            for run in runs
-        ]
-
-    def get_research_run(self, db: Session, run_id: int) -> ResearchResponse | None:
-        run = self.repository.get_run(db, run_id)
-        if not run:
-            return None
-
-        sorted_sources = sorted(
-            run.sources,
-            key=lambda src: (src.credibility_score + src.relevance_score),
-            reverse=True,
-        )
-        source_dicts = [
-            {
-                "title": src.title,
-                "url": src.url,
-                "snippet": src.snippet,
-                "credibility_score": src.credibility_score,
-                "relevance_score": src.relevance_score,
-            }
-            for src in sorted_sources
-        ]
-
-        return ResearchResponse(
-            id=run.id,
-            query=run.query,
-            summary=run.summary,
-            citations=[CitationItem(**item) for item in build_citations(source_dicts)],
-            sources=[ResearchSourceRead(**item) for item in source_dicts],
-            created_at=run.created_at,
-        )
+        db.refresh(research)
+        db.refresh(summary)
+        for citation in citation_rows:
+            db.refresh(citation)
+        return research, summary, citation_rows
