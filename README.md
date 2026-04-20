@@ -14,6 +14,8 @@ Autonomous AI research agent monorepo with a FastAPI backend and React frontend.
 - `POST /api/research`
 - `GET /api/research`
 - `GET /api/research/{id}`
+- `GET /api/research/{id}/trace`
+- `GET /api/research/{id}/metrics`
 - `GET /api/sources/{research_id}`
 - `GET /api/memory/{research_id}`
 
@@ -22,8 +24,11 @@ Autonomous AI research agent monorepo with a FastAPI backend and React frontend.
 - Search tool
 - Scraping/extraction with `requests` + `BeautifulSoup`
 - Validation layer
+- Source credibility scoring + contradiction detection
+- Structured report synthesis with claim-to-source links
 - Summarization agent
 - Citation generation
+- Research stage tracing + metrics
 - FAISS memory persistence
 
 ### Frontend pages
