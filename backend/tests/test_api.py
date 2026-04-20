@@ -1,5 +1,6 @@
 import os
 from collections.abc import Generator
+import json
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -15,7 +16,7 @@ from app.services.research_service import ResearchService
 
 class FakeResearchService(ResearchService):
     def run(self, db: Session, user_id: int, query: str):
-        from app.models import Citation, Memory, ResearchSession, Source, Summary
+        from app.models import Citation, Memory, ResearchSession, ResearchTraceEvent, Source, Summary
 
         research = ResearchSession(user_id=user_id, query=query, status="completed")
         db.add(research)
@@ -38,7 +39,29 @@ class FakeResearchService(ResearchService):
             excerpt="A" * 120,
         )
         memory = Memory(research_id=research.id, chunk="A" * 200, source_url=source.url, score=1.0)
-        db.add_all([summary, citation, memory])
+        summary.structured_report = json.dumps(
+            {
+                "executive_summary": "Summary content",
+                "findings": [
+                    {
+                        "claim": "Example Source",
+                        "confidence": 0.8,
+                        "support": [{"source_id": source.id, "marker": "[1]", "excerpt": "A" * 100}],
+                    }
+                ],
+                "evidence_coverage": {"supported_claims": 1, "total_claims": 1, "score": 1.0},
+                "contradictions": [],
+                "conclusion": "Consistent",
+            }
+        )
+        trace = ResearchTraceEvent(
+            research_id=research.id,
+            stage="complete",
+            state="completed",
+            detail="Research complete",
+            latency_ms=10.0,
+        )
+        db.add_all([summary, citation, memory, trace])
         db.commit()
         db.refresh(research)
         db.refresh(summary)
@@ -103,6 +126,7 @@ def test_research_endpoints() -> None:
     detail_response = client.get(f"/api/research/{research_id}", headers=headers)
     assert detail_response.status_code == 200
     assert detail_response.json()["summary"]
+    assert detail_response.json()["report"]["findings"]
 
     sources_response = client.get(f"/api/sources/{research_id}", headers=headers)
     assert sources_response.status_code == 200
@@ -111,3 +135,11 @@ def test_research_endpoints() -> None:
     memory_response = client.get(f"/api/memory/{research_id}", headers=headers)
     assert memory_response.status_code == 200
     assert len(memory_response.json()) == 1
+
+    trace_response = client.get(f"/api/research/{research_id}/trace", headers=headers)
+    assert trace_response.status_code == 200
+    assert len(trace_response.json()) >= 1
+
+    metrics_response = client.get(f"/api/research/{research_id}/metrics", headers=headers)
+    assert metrics_response.status_code == 200
+    assert metrics_response.json()["source_count"] == 1

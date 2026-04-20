@@ -31,6 +31,8 @@ class SourceRead(BaseModel):
     title: str
     url: str
     content: str
+    source_type: str
+    credibility_score: float
 
     model_config = {"from_attributes": True}
 
@@ -56,9 +58,29 @@ class ResearchDetail(BaseModel):
     research: ResearchRead
     summary: str
     citations: list[CitationRead]
+    report: dict
 
 
 class ResearchResult(BaseModel):
     research_id: int
     summary: str
     citations: list[CitationRead]
+    report: dict
+
+
+class ResearchTraceRead(BaseModel):
+    stage: str
+    state: str
+    detail: str
+    latency_ms: float
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ResearchMetricsRead(BaseModel):
+    source_count: int
+    average_credibility_score: float
+    citation_coverage_score: float
+    evidence_coverage_score: float
+    contradiction_rate: float

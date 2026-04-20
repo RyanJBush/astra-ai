@@ -1,15 +1,19 @@
+import json
+
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import Base, engine, get_db
-from app.models import Citation, Memory, ResearchSession, Source, Summary, User
+from app.models import Citation, Memory, ResearchSession, ResearchTraceEvent, Source, Summary, User
 from app.schemas import (
     LoginRequest,
     MemoryRead,
     ResearchCreate,
     ResearchDetail,
+    ResearchMetricsRead,
     ResearchRead,
     ResearchResult,
+    ResearchTraceRead,
     SourceRead,
     TokenResponse,
 )
@@ -56,7 +60,13 @@ def create_research(
     user: User = Depends(get_current_user),
 ) -> ResearchResult:
     research, summary, citations = app.state.research_service.run(db, user.id, payload.query)
-    return ResearchResult(research_id=research.id, summary=summary.content, citations=citations)
+    report = json.loads(summary.structured_report) if summary.structured_report else {}
+    return ResearchResult(
+        research_id=research.id,
+        summary=summary.content,
+        citations=citations,
+        report=report,
+    )
 
 
 @app.get("/api/research", response_model=list[ResearchRead])
@@ -92,6 +102,7 @@ def get_research(
         research=research,
         summary=summary.content if summary else "",
         citations=citations,
+        report=json.loads(summary.structured_report) if summary and summary.structured_report else {},
     )
 
 
@@ -113,6 +124,44 @@ def get_memory(
 ) -> list[Memory]:
     _validate_research_owner(db, research_id, user.id)
     return db.query(Memory).filter(Memory.research_id == research_id).all()
+
+
+@app.get("/api/research/{research_id}/trace", response_model=list[ResearchTraceRead])
+def get_research_trace(
+    research_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[ResearchTraceEvent]:
+    _validate_research_owner(db, research_id, user.id)
+    return (
+        db.query(ResearchTraceEvent)
+        .filter(ResearchTraceEvent.research_id == research_id)
+        .order_by(ResearchTraceEvent.created_at.asc())
+        .all()
+    )
+
+
+@app.get("/api/research/{research_id}/metrics", response_model=ResearchMetricsRead)
+def get_research_metrics(
+    research_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ResearchMetricsRead:
+    _validate_research_owner(db, research_id, user.id)
+    summary = db.query(Summary).filter(Summary.research_id == research_id).first()
+    sources = db.query(Source).filter(Source.research_id == research_id).all()
+    citations = db.query(Citation).filter(Citation.research_id == research_id).all()
+    if summary is None:
+        return ResearchMetricsRead(
+            source_count=len(sources),
+            average_credibility_score=0.0,
+            citation_coverage_score=0.0,
+            evidence_coverage_score=0.0,
+            contradiction_rate=0.0,
+        )
+    return ResearchMetricsRead.model_validate(
+        app.state.research_service.metrics(summary, sources, citations)
+    )
 
 
 def _validate_research_owner(db: Session, research_id: int, user_id: int) -> None:
