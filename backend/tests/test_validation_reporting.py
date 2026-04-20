@@ -8,7 +8,7 @@ def test_source_classification_and_credibility() -> None:
     source_type = validator.classify_source_type("https://www.nasa.gov/mission")
     score = validator.score_source_credibility(
         "https://www.nasa.gov/mission",
-        "A" * 1500,
+        "NASA released mission documentation with detailed methodology and findings. " * 25,
         source_type,
     )
     assert source_type == "official_docs"

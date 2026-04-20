@@ -1,6 +1,6 @@
+import json
 import os
 from collections.abc import Generator
-import json
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -11,14 +11,13 @@ os.environ["ASTRA_DATABASE_URL"] = "sqlite://"
 
 from app.database import Base, get_db
 from app.main import app
+from app.models import Citation, Memory, ResearchSession, ResearchTraceEvent, Source, Summary
 from app.services.research_service import ResearchService
 
 
 class FakeResearchService(ResearchService):
     def run(self, db: Session, user_id: int, query: str):
-        from app.models import Citation, Memory, ResearchSession, ResearchTraceEvent, Source, Summary
-
-        research = ResearchSession(user_id=user_id, query=query, status="completed")
+        research = ResearchSession(user_id=user_id, query=query, status="complete")
         db.add(research)
         db.flush()
 
@@ -46,7 +45,9 @@ class FakeResearchService(ResearchService):
                     {
                         "claim": "Example Source",
                         "confidence": 0.8,
-                        "support": [{"source_id": source.id, "marker": "[1]", "excerpt": "A" * 100}],
+                        "support": [
+                            {"source_id": source.id, "marker": "[1]", "excerpt": "A" * 100}
+                        ],
                     }
                 ],
                 "evidence_coverage": {"supported_claims": 1, "total_claims": 1, "score": 1.0},

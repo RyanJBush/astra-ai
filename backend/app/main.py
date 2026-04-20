@@ -102,7 +102,11 @@ def get_research(
         research=research,
         summary=summary.content if summary else "",
         citations=citations,
-        report=json.loads(summary.structured_report) if summary and summary.structured_report else {},
+        report=(
+            json.loads(summary.structured_report)
+            if summary and summary.structured_report
+            else {}
+        ),
     )
 
 

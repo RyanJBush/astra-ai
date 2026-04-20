@@ -85,7 +85,12 @@ class ReportBuilder:
         lines.append(f"Conclusion: {report['conclusion']}")
         return "\n".join(lines)
 
-    def metrics(self, report: dict, sources: list[Source], citations: list[Citation]) -> dict[str, float | int]:
+    def metrics(
+        self,
+        report: dict,
+        sources: list[Source],
+        citations: list[Citation],
+    ) -> dict[str, float | int]:
         source_count = len(sources)
         citation_coverage = 0.0
         if source_count:
@@ -97,8 +102,12 @@ class ReportBuilder:
             else 0.0
         )
         contradiction_rate = 0.0
-        if report["findings"]:
-            contradiction_rate = round(len(report["contradictions"]) / len(report["findings"]), 3)
+        source_pair_count = source_count * (source_count - 1) / 2
+        if source_pair_count > 0:
+            contradiction_rate = round(
+                min(1.0, len(report["contradictions"]) / source_pair_count),
+                3,
+            )
         return {
             "source_count": source_count,
             "average_credibility_score": avg_credibility,

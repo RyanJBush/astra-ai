@@ -8,8 +8,25 @@ class ValidationLayer:
     BLOG_HINTS = ("medium.com", "substack.com", "blog")
     NEWS_HINTS = ("reuters.com", "bbc.com", "nytimes.com", "apnews.com")
 
-    POSITIVE_CLAIM_HINTS = ("is effective", "increases", "improves", "reduces")
-    NEGATIVE_CLAIM_HINTS = ("is not effective", "does not increase", "does not improve", "worsens")
+    POSITIVE_CLAIM_HINTS = (
+        "is effective",
+        "effective",
+        "increases",
+        "improves",
+        "beneficial",
+        "outperforms",
+    )
+    NEGATIVE_CLAIM_HINTS = (
+        "is not effective",
+        "ineffective",
+        "does not increase",
+        "doesn't increase",
+        "does not improve",
+        "doesn't improve",
+        "worsens",
+        "decreases",
+        "harmful",
+    )
 
     def filter_sources(self, sources: list[dict[str, str]]) -> list[dict[str, str | float]]:
         validated: list[dict[str, str | float]] = []
@@ -58,17 +75,31 @@ class ValidationLayer:
         score = min(1.0, base + https_bonus + length_bonus)
         return round(score, 3)
 
-    def detect_contradictions(self, sources: list[dict[str, str | float]]) -> list[dict[str, str | int]]:
+    def detect_contradictions(
+        self,
+        sources: list[dict[str, str | float]],
+    ) -> list[dict[str, str | int]]:
+        analyzed_sources = [
+            {
+                "content": str(source.get("content", "")).lower(),
+                "title": str(source.get("title", "")),
+            }
+            for source in sources
+        ]
+        polarity_by_index: dict[int, tuple[bool, bool]] = {}
+        for index, source in enumerate(analyzed_sources):
+            content = source["content"]
+            polarity_by_index[index] = (
+                any(term in content for term in self.POSITIVE_CLAIM_HINTS),
+                any(term in content for term in self.NEGATIVE_CLAIM_HINTS),
+            )
+
         contradictions: list[dict[str, str | int]] = []
-        for left_idx, left_source in enumerate(sources):
-            left_content = str(left_source.get("content", "")).lower()
-            for right_idx in range(left_idx + 1, len(sources)):
-                right_source = sources[right_idx]
-                right_content = str(right_source.get("content", "")).lower()
-                has_positive_left = any(term in left_content for term in self.POSITIVE_CLAIM_HINTS)
-                has_negative_left = any(term in left_content for term in self.NEGATIVE_CLAIM_HINTS)
-                has_positive_right = any(term in right_content for term in self.POSITIVE_CLAIM_HINTS)
-                has_negative_right = any(term in right_content for term in self.NEGATIVE_CLAIM_HINTS)
+        for left_idx, left_source in enumerate(analyzed_sources):
+            for right_idx in range(left_idx + 1, len(analyzed_sources)):
+                right_source = analyzed_sources[right_idx]
+                has_positive_left, has_negative_left = polarity_by_index[left_idx]
+                has_positive_right, has_negative_right = polarity_by_index[right_idx]
                 if (has_positive_left and has_negative_right) or (
                     has_negative_left and has_positive_right
                 ):

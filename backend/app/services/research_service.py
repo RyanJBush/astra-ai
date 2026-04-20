@@ -80,11 +80,15 @@ class ResearchService:
                 research,
                 "validating",
                 validating_started,
-                f"Validated {len(validated_sources)} sources with {len(contradictions)} contradictions",
+                (
+                    f"Validated {len(validated_sources)} sources with "
+                    f"{len(contradictions)} contradictions"
+                ),
             )
 
             source_rows: list[Source] = []
             for source_payload in validated_sources:
+                content_chunk = str(source_payload["content"])[:500]
                 row = Source(
                     research_id=research.id,
                     title=str(source_payload["title"]),
@@ -96,14 +100,14 @@ class ResearchService:
                 db.add(row)
                 source_rows.append(row)
                 self.memory.add_chunks(
-                    [str(source_payload["content"])[:500]],
+                    [content_chunk],
                     research.id,
                     str(source_payload["url"]),
                 )
                 db.add(
                     Memory(
                         research_id=research.id,
-                        chunk=str(source_payload["content"])[:500],
+                        chunk=content_chunk,
                         source_url=str(source_payload["url"]),
                         score=1.0,
                     )
@@ -174,7 +178,12 @@ class ResearchService:
             db.commit()
             raise
 
-    def metrics(self, summary: Summary, sources: list[Source], citations: list[Citation]) -> dict[str, float | int]:
+    def metrics(
+        self,
+        summary: Summary,
+        sources: list[Source],
+        citations: list[Citation],
+    ) -> dict[str, float | int]:
         report = json.loads(summary.structured_report) if summary.structured_report else {}
         if not report:
             return {

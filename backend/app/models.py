@@ -32,7 +32,9 @@ class ResearchSession(Base):
     summary: Mapped["Summary"] = relationship(back_populates="research_session", uselist=False)
     citations: Mapped[list["Citation"]] = relationship(back_populates="research_session")
     memory_entries: Mapped[list["Memory"]] = relationship(back_populates="research_session")
-    trace_events: Mapped[list["ResearchTraceEvent"]] = relationship(back_populates="research_session")
+    trace_events: Mapped[list["ResearchTraceEvent"]] = relationship(
+        back_populates="research_session"
+    )
 
 
 class Source(Base):
