@@ -1,6 +1,6 @@
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -13,9 +13,14 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(50), default="user")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    workspace_id: Mapped[int | None] = mapped_column(ForeignKey("workspaces.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+    )
 
     research_sessions: Mapped[list["ResearchSession"]] = relationship(back_populates="user")
+    workspace: Mapped["Workspace"] = relationship(back_populates="users")
 
 
 class ResearchSession(Base):
@@ -23,9 +28,19 @@ class ResearchSession(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    workspace_id: Mapped[int | None] = mapped_column(ForeignKey("workspaces.id"), index=True)
     query: Mapped[str] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(String(50), default="planning")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    status: Mapped[str] = mapped_column(String(50), default="planning", index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    parent_session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("research_sessions.id"),
+        nullable=True,
+    )
+    is_paused: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+    )
 
     user: Mapped[User] = relationship(back_populates="research_sessions")
     sources: Mapped[list["Source"]] = relationship(back_populates="research_session")
@@ -35,6 +50,10 @@ class ResearchSession(Base):
     trace_events: Mapped[list["ResearchTraceEvent"]] = relationship(
         back_populates="research_session"
     )
+    agent_metrics: Mapped[list["AgentRunMetric"]] = relationship(
+        back_populates="research_session"
+    )
+    workspace: Mapped["Workspace"] = relationship(back_populates="research_sessions")
 
 
 class Source(Base):
@@ -58,6 +77,8 @@ class Summary(Base):
     research_id: Mapped[int] = mapped_column(ForeignKey("research_sessions.id"), unique=True)
     content: Mapped[str] = mapped_column(Text)
     structured_report: Mapped[str] = mapped_column(Text, default="")
+    requires_review: Mapped[bool] = mapped_column(Boolean, default=False)
+    review_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     research_session: Mapped[ResearchSession] = relationship(back_populates="summary")
 
@@ -94,7 +115,62 @@ class ResearchTraceEvent(Base):
     stage: Mapped[str] = mapped_column(String(64))
     state: Mapped[str] = mapped_column(String(32), default="completed")
     detail: Mapped[str] = mapped_column(Text, default="")
+    error_category: Mapped[str | None] = mapped_column(String(64), nullable=True)
     latency_ms: Mapped[float] = mapped_column(Float, default=0.0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+    )
 
     research_session: Mapped[ResearchSession] = relationship(back_populates="trace_events")
+
+
+class AgentRunMetric(Base):
+    __tablename__ = "agent_run_metrics"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    research_id: Mapped[int] = mapped_column(ForeignKey("research_sessions.id"), index=True)
+    agent_name: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="completed")
+    attempts: Mapped[int] = mapped_column(Integer, default=1)
+    latency_ms: Mapped[float] = mapped_column(Float, default=0.0)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    research_session: Mapped[ResearchSession] = relationship(back_populates="agent_metrics")
+
+
+class Workspace(Base):
+    __tablename__ = "workspaces"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    users: Mapped[list[User]] = relationship(back_populates="workspace")
+    research_sessions: Mapped[list[ResearchSession]] = relationship(back_populates="workspace")
+    audit_logs: Mapped[list["AuditLog"]] = relationship(back_populates="workspace")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    action: Mapped[str] = mapped_column(String(128))
+    resource_type: Mapped[str] = mapped_column(String(64))
+    resource_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    detail: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    workspace: Mapped[Workspace] = relationship(back_populates="audit_logs")

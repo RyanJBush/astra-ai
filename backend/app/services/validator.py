@@ -27,14 +27,39 @@ class ValidationLayer:
         "decreases",
         "harmful",
     )
+    UNSAFE_CONTENT_HINTS = (
+        "ignore previous instructions",
+        "disregard instructions",
+        "system prompt",
+        "developer message",
+    )
 
-    def filter_sources(self, sources: list[dict[str, str]]) -> list[dict[str, str | float]]:
+    def filter_sources(
+        self,
+        sources: list[dict[str, str]],
+        allow_domains: list[str] | None = None,
+        deny_domains: list[str] | None = None,
+    ) -> list[dict[str, str | float]]:
         validated: list[dict[str, str | float]] = []
+        normalized_allow = {domain.lower() for domain in (allow_domains or [])}
+        normalized_deny = {domain.lower() for domain in (deny_domains or [])}
+        seen_fingerprints: set[str] = set()
         for source in sources:
             content = source.get("content", "")
             url = source.get("url", "")
             if len(content) < 100 or not url.startswith("http"):
                 continue
+            if self.has_prompt_injection_signal(content):
+                continue
+            host = self._host(url)
+            if normalized_deny and any(host.endswith(domain) for domain in normalized_deny):
+                continue
+            if normalized_allow and not any(host.endswith(domain) for domain in normalized_allow):
+                continue
+            fingerprint = self._dedupe_fingerprint(source.get("title", ""), url, content)
+            if fingerprint in seen_fingerprints:
+                continue
+            seen_fingerprints.add(fingerprint)
             source_type = self.classify_source_type(url)
             credibility_score = self.score_source_credibility(url, content, source_type)
             validated.append(
@@ -74,6 +99,25 @@ class ValidationLayer:
         length_bonus = 0.02 if len(content) > 1000 else 0.0
         score = min(1.0, base + https_bonus + length_bonus)
         return round(score, 3)
+
+    def score_evidence_coverage(
+        self,
+        findings: list[dict[str, object]],
+    ) -> dict[str, object]:
+        if not findings:
+            return {"supported_claims": 0, "total_claims": 0, "score": 0.0, "unsupported_claims": []}
+        unsupported_claims = [
+            str(finding.get("claim", ""))
+            for finding in findings
+            if not finding.get("support")
+        ]
+        supported = len(findings) - len(unsupported_claims)
+        return {
+            "supported_claims": supported,
+            "total_claims": len(findings),
+            "score": round(supported / len(findings), 3),
+            "unsupported_claims": unsupported_claims,
+        }
 
     def detect_contradictions(
         self,
@@ -115,10 +159,18 @@ class ValidationLayer:
         return contradictions
 
     def evidence_coverage_score(self, findings: list[dict[str, object]]) -> float:
-        if not findings:
-            return 0.0
-        supported = sum(1 for finding in findings if finding.get("support"))
-        return round(supported / len(findings), 3)
+        coverage = self.score_evidence_coverage(findings)
+        return float(coverage["score"])
 
     def _host(self, url: str) -> str:
         return (urlparse(url).hostname or "").lower()
+
+    def _dedupe_fingerprint(self, title: str, url: str, content: str) -> str:
+        normalized_title = str(title).strip().lower()
+        normalized_url = str(url).strip().lower().split("#", maxsplit=1)[0]
+        content_head = str(content).strip().lower()[:250]
+        return f"{normalized_title}|{normalized_url}|{content_head}"
+
+    def has_prompt_injection_signal(self, content: str) -> bool:
+        lowered = str(content).lower()
+        return any(hint in lowered for hint in self.UNSAFE_CONTENT_HINTS)
