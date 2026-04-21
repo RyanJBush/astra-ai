@@ -11,13 +11,17 @@ os.environ["ASTRA_DATABASE_URL"] = "sqlite://"
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import Citation, Memory, ResearchSession, ResearchTraceEvent, Source, Summary
+from app.models import Citation, Memory, ResearchSession, ResearchTraceEvent, Source, Summary, User
 from app.services.research_service import ResearchService
 
 
 class FakeResearchService(ResearchService):
-    def run(self, db: Session, user_id: int, query: str):
+    def run(self, db: Session, user_id: int, query: str, **kwargs):
         research = ResearchSession(user_id=user_id, query=query, status="complete")
+        if "parent_session_id" in kwargs:
+            research.parent_session_id = kwargs["parent_session_id"]
+        if "version" in kwargs:
+            research.version = kwargs["version"]
         db.add(research)
         db.flush()
 
@@ -43,14 +47,20 @@ class FakeResearchService(ResearchService):
                 "executive_summary": "Summary content",
                 "findings": [
                     {
+                        "claim_id": "F-1",
                         "claim": "Example Source",
                         "confidence": 0.8,
+                        "confidence_level": "medium",
+                        "source_links": ["https://example.com"],
                         "support": [
                             {"source_id": source.id, "marker": "[1]", "excerpt": "A" * 100}
                         ],
                     }
                 ],
                 "evidence_coverage": {"supported_claims": 1, "total_claims": 1, "score": 1.0},
+                "open_questions": ["Which additional primary sources could increase confidence?"],
+                "disclaimer": None,
+                "compliance": {"pii_redactions": 0},
                 "contradictions": [],
                 "conclusion": "Consistent",
             }
@@ -60,6 +70,7 @@ class FakeResearchService(ResearchService):
             stage="complete",
             state="completed",
             detail="Research complete",
+            error_category=None,
             latency_ms=10.0,
         )
         db.add_all([summary, citation, memory, trace])
@@ -103,6 +114,20 @@ def login_headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def admin_headers() -> dict[str, str]:
+    headers = login_headers()
+    db = TestingSessionLocal()
+    try:
+        user = db.query(User).filter(User.email == "user@example.com").first()
+        assert user is not None
+        user.role = "admin"
+        db.add(user)
+        db.commit()
+    finally:
+        db.close()
+    return headers
+
+
 def test_health() -> None:
     response = client.get("/health")
     assert response.status_code == 200
@@ -128,6 +153,7 @@ def test_research_endpoints() -> None:
     assert detail_response.status_code == 200
     assert detail_response.json()["summary"]
     assert detail_response.json()["report"]["findings"]
+    assert "requires_review" in detail_response.json()
 
     sources_response = client.get(f"/api/sources/{research_id}", headers=headers)
     assert sources_response.status_code == 200
@@ -144,3 +170,63 @@ def test_research_endpoints() -> None:
     metrics_response = client.get(f"/api/research/{research_id}/metrics", headers=headers)
     assert metrics_response.status_code == 200
     assert metrics_response.json()["source_count"] == 1
+    assert "stage_latency_ms" in metrics_response.json()
+    assert "total_latency_ms" in metrics_response.json()
+    assert "fact_support_ratio" in metrics_response.json()
+
+    export_markdown_response = client.get(
+        f"/api/research/{research_id}/export?format=markdown",
+        headers=headers,
+    )
+    assert export_markdown_response.status_code == 200
+    assert "## Findings" in export_markdown_response.text
+
+    export_json_response = client.get(
+        f"/api/research/{research_id}/export?format=json",
+        headers=headers,
+    )
+    assert export_json_response.status_code == 200
+    assert "findings" in export_json_response.json()
+
+    replay_response = client.get(f"/api/research/{research_id}/replay", headers=headers)
+    assert replay_response.status_code == 200
+    assert replay_response.json()["research_id"] == research_id
+    assert replay_response.json()["timeline"]
+    assert "complete" in replay_response.json()["stage_counts"]
+
+    agent_metrics_response = client.get(
+        f"/api/research/{research_id}/agent-metrics",
+        headers=headers,
+    )
+    assert agent_metrics_response.status_code == 200
+    assert isinstance(agent_metrics_response.json(), list)
+
+    compliance_response = client.get(
+        f"/api/research/{research_id}/compliance",
+        headers=headers,
+    )
+    assert compliance_response.status_code == 200
+    assert "pii_redactions" in compliance_response.json()
+
+    workspace_response = client.get("/api/workspaces/current", headers=headers)
+    assert workspace_response.status_code == 200
+    assert workspace_response.json()["name"].endswith("-workspace")
+
+    pause_response = client.post(f"/api/research/{research_id}/pause", headers=headers)
+    assert pause_response.status_code == 200
+    assert pause_response.json()["status"] == "paused"
+    assert pause_response.json()["is_paused"] is True
+
+    resume_response = client.post(f"/api/research/{research_id}/resume", headers=headers)
+    assert resume_response.status_code == 200
+    assert resume_response.json()["status"] == "planning"
+    assert resume_response.json()["is_paused"] is False
+
+    retry_response = client.post(f"/api/research/{research_id}/retry", headers=headers)
+    assert retry_response.status_code == 200
+    assert retry_response.json()["research_id"] != research_id
+
+    admin = admin_headers()
+    audit_response = client.get("/api/audit-logs", headers=admin)
+    assert audit_response.status_code == 200
+    assert any(item["action"] == "research.create" for item in audit_response.json())
