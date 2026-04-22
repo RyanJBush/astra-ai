@@ -229,7 +229,7 @@ def test_report_builder_metrics_with_multiple_sources_and_contradictions() -> No
         ),
     ]
     report = {
-        "contradictions": [{"a": 1}],
+        "contradictions": [{"reason": "inconsistent outcomes"}],
         "evidence_coverage": {"score": 0.5},
     }
     metrics = builder.metrics(report, sources, [])
