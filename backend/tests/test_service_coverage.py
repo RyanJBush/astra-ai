@@ -291,11 +291,14 @@ def test_search_tool_uses_raise_for_status(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_scraper_limits_content_and_title_length(monkeypatch: pytest.MonkeyPatch) -> None:
-    long_title = "T" * 800
-    long_paragraph = "P" * 7000
+    oversized_title = "T" * 800
+    oversized_paragraph = "P" * 7000
     response = _FakeResponse(
         [],
-        text=f"<html><head><title>{long_title}</title></head><body><p>{long_paragraph}</p></body></html>",
+        text=(
+            f"<html><head><title>{oversized_title}</title></head>"
+            f"<body><p>{oversized_paragraph}</p></body></html>"
+        ),
     )
     monkeypatch.setattr("app.services.scraper.requests.get", lambda *_args, **_kwargs: response)
     title, content = Scraper().extract("https://example.com")
