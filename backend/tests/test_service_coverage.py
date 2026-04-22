@@ -1,10 +1,4 @@
-from types import SimpleNamespace
-
 import pytest
-from fastapi import HTTPException
-from fastapi.security import HTTPAuthorizationCredentials
-from jose import jwt
-
 from app.config import settings
 from app.models import Citation, Source, User
 from app.security import (
@@ -20,6 +14,9 @@ from app.services.scraper import Scraper
 from app.services.search import SearchTool
 from app.services.summarizer import SummarizationAgent
 from app.services.tool_registry import ToolRegistry
+from fastapi import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
+from jose import jwt
 
 
 class _FakeResponse:
@@ -77,7 +74,10 @@ def test_search_tool_returns_first_three_links(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_search_tool_handles_unexpected_payload(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.services.search.requests.get", lambda *_args, **_kwargs: _FakeResponse({}))
+    monkeypatch.setattr(
+        "app.services.search.requests.get",
+        lambda *_args, **_kwargs: _FakeResponse({}),
+    )
     links = SearchTool().search("query")
     assert links == []
 
@@ -260,7 +260,9 @@ def test_report_builder_disclaimer_for_low_coverage_and_summary_disclaimer() -> 
         "executive_summary": "Summary",
         "findings": [],
         "open_questions": [],
-        "disclaimer": "Limited evidence coverage; more sources are required before relying on findings.",
+        "disclaimer": (
+            "Limited evidence coverage; more sources are required before relying on findings."
+        ),
         "conclusion": "Tentative",
     }
     text = builder.to_summary_text(report)
