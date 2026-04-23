@@ -9,6 +9,7 @@ from app.security import (
     verify_password,
 )
 from app.services.citations import CitationSystem
+from app.services.memory_store import MemoryStore, SimpleEmbeddings
 from app.services.reporting import ReportBuilder
 from app.services.scraper import Scraper
 from app.services.search import SearchTool
@@ -304,3 +305,17 @@ def test_scraper_limits_content_and_title_length(monkeypatch: pytest.MonkeyPatch
     title, content = Scraper().extract("https://example.com")
     assert len(title) == 500
     assert len(content) == 5000
+
+
+def test_simple_embeddings_are_stable_and_fixed_width() -> None:
+    embeddings = SimpleEmbeddings()
+    vector = embeddings.embed_query("abc")
+    assert len(vector) == 8
+    assert vector == embeddings.embed_documents(["abc"])[0]
+
+
+def test_memory_store_add_chunks_updates_vector_count() -> None:
+    store = MemoryStore()
+    initial_total = store._store.index.ntotal
+    store.add_chunks(["chunk one", "chunk two"], research_id=7, source_url="https://example.com")
+    assert store._store.index.ntotal == initial_total + 2

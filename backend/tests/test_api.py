@@ -2,6 +2,7 @@ import json
 import os
 from collections.abc import Generator
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -133,6 +134,126 @@ def test_health() -> None:
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
+
+
+def test_login_rejects_invalid_password() -> None:
+    first = client.post(
+        "/api/auth/login",
+        json={"email": "wrongpass@example.com", "password": "correct-pass"},
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/api/auth/login",
+        json={"email": "wrongpass@example.com", "password": "incorrect-pass"},
+    )
+    assert second.status_code == 401
+    assert second.json()["detail"] == "Invalid credentials"
+
+
+def test_create_research_enforces_daily_quota(monkeypatch: pytest.MonkeyPatch) -> None:
+    headers = login_headers()
+    monkeypatch.setattr("app.main.settings.daily_research_quota", 0)
+
+    response = client.post(
+        "/api/research",
+        json={"query": "quota check"},
+        headers=headers,
+    )
+    assert response.status_code == 429
+    assert response.json()["detail"] == "Daily research quota exceeded"
+
+
+def test_get_research_not_found_returns_404() -> None:
+    headers = login_headers()
+    response = client.get("/api/research/999999", headers=headers)
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Research not found"
+
+
+def test_metrics_and_compliance_return_defaults_when_summary_missing() -> None:
+    headers = login_headers()
+    create_response = client.post(
+        "/api/research",
+        json={"query": "summary removal"},
+        headers=headers,
+    )
+    research_id = create_response.json()["research_id"]
+
+    db = TestingSessionLocal()
+    try:
+        summary = db.query(Summary).filter(Summary.research_id == research_id).first()
+        assert summary is not None
+        db.delete(summary)
+        db.commit()
+    finally:
+        db.close()
+
+    metrics_response = client.get(f"/api/research/{research_id}/metrics", headers=headers)
+    assert metrics_response.status_code == 200
+    assert metrics_response.json()["evidence_coverage_score"] == 0.0
+    assert metrics_response.json()["stage_latency_ms"] == {}
+
+    compliance_response = client.get(f"/api/research/{research_id}/compliance", headers=headers)
+    assert compliance_response.status_code == 200
+    assert compliance_response.json()["pii_redactions"] == 0
+    assert compliance_response.json()["review_required"] is False
+
+
+def test_export_report_errors_for_missing_and_unsupported_formats() -> None:
+    headers = login_headers()
+    create_response = client.post(
+        "/api/research",
+        json={"query": "export checks"},
+        headers=headers,
+    )
+    research_id = create_response.json()["research_id"]
+
+    bad_format_response = client.get(
+        f"/api/research/{research_id}/export?format=xml",
+        headers=headers,
+    )
+    assert bad_format_response.status_code == 400
+    assert bad_format_response.json()["detail"] == "Unsupported export format"
+
+    db = TestingSessionLocal()
+    try:
+        summary = db.query(Summary).filter(Summary.research_id == research_id).first()
+        assert summary is not None
+        db.delete(summary)
+        db.commit()
+    finally:
+        db.close()
+
+    missing_response = client.get(
+        f"/api/research/{research_id}/export?format=markdown",
+        headers=headers,
+    )
+    assert missing_response.status_code == 404
+    assert missing_response.json()["detail"] == "Report not found"
+
+
+def test_workspace_endpoint_returns_404_when_workspace_missing() -> None:
+    login_response = client.post(
+        "/api/auth/login",
+        json={"email": "missing-workspace@example.com", "password": "strong-password"},
+    )
+    assert login_response.status_code == 200
+    headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+    db = TestingSessionLocal()
+    try:
+        user = db.query(User).filter(User.email == "missing-workspace@example.com").first()
+        assert user is not None
+        user.workspace_id = None
+        db.add(user)
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get("/api/workspaces/current", headers=headers)
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Workspace not found"
 
 def test_research_endpoints() -> None:
     headers = login_headers()
