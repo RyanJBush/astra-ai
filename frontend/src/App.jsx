@@ -534,6 +534,7 @@ function ResearchResultsPage() {
                       : 'border-slate-200'
                   }`}
                   onClick={() => setSelectedClaimId(finding.claim_id)}
+                  className="rounded-md border border-slate-200 p-3"
                 >
                   <div className="flex items-center justify-between">
                     <p className="font-medium">{finding.claim}</p>
@@ -553,6 +554,8 @@ function ResearchResultsPage() {
                       {finding.confidence_rationale}
                     </p>
                   )}
+                    Confidence: {finding.confidence}
+                  </p>
                 </article>
               ))}
             </div>
@@ -602,6 +605,7 @@ function ResearchResultsPage() {
               </div>
               <ul className="mt-3 space-y-2 text-sm">
                 {evidenceTable.map((source) => (
+                {(detail.report?.evidence_table || []).map((source) => (
                   <li
                     key={source.source_id}
                     className="rounded border border-slate-200 p-2"
@@ -648,6 +652,9 @@ function ResearchResultsPage() {
                         {item.severity || 'medium'}
                       </span>
                     </div>
+                    <p className="font-medium">
+                      {item.claim_a} vs {item.claim_b}
+                    </p>
                     <p className="text-xs text-slate-600">{item.reason}</p>
                   </li>
                 ))}
@@ -669,6 +676,9 @@ function ResearchResultsPage() {
                       <span>{event.state}</span>
                       <span>{Number(event.latency_ms || 0).toFixed(1)} ms</span>
                     </div>
+                    <span className="text-xs text-slate-500">
+                      {event.state}
+                    </span>
                   </div>
                   <p className="text-xs text-slate-600">{event.detail}</p>
                   <p className="text-xs text-slate-400">
@@ -765,6 +775,7 @@ function SourceViewerPage() {
           />
         )}
         {filtered.map((source) => (
+        {sources.map((source) => (
           <article
             key={source.id}
             className="rounded-md border border-slate-200 bg-white p-4"
