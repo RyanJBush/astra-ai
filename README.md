@@ -59,6 +59,17 @@ Autonomous AI research agent monorepo with a FastAPI backend and React frontend.
 ### Backend
 ```bash
 cd backend
+cp .env.example .env
+PYENV_VERSION=3.11.14 python -m pip install -e .[dev]
+PYENV_VERSION=3.11.14 python -m uvicorn app.main:app --reload
+```
+
+> Prefer Python 3.11+ for local development (CI runs on 3.11).
+
+### Backend (without pyenv)
+```bash
+cd backend
+cp .env.example .env
 pip install -e .[dev]
 uvicorn app.main:app --reload
 ```
@@ -66,6 +77,7 @@ uvicorn app.main:app --reload
 ### Frontend
 ```bash
 cd frontend
+cp .env.example .env
 npm install
 npm run dev
 ```

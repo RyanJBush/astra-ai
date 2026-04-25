@@ -14,8 +14,8 @@ from app.models import (
 )
 from app.services.citations import CitationSystem
 from app.services.memory_store import MemoryStore
-from app.services.planner import PlannerAgent
 from app.services.pii_redactor import PIIRedactor
+from app.services.planner import PlannerAgent
 from app.services.reporting import ReportBuilder
 from app.services.scraper import Scraper
 from app.services.search import SearchTool
@@ -88,7 +88,11 @@ class ResearchService:
                 iteration_queries = active_queries if iteration == 0 else active_queries[:breadth]
                 discovered_urls_iteration: list[str] = []
                 for step in iteration_queries:
-                    for search_query in self.planner.generate_search_queries(step, recency_days=recency_days):
+                    search_queries = self.planner.generate_search_queries(
+                        step,
+                        recency_days=recency_days,
+                    )
+                    for search_query in search_queries:
                         try:
                             discovered_urls_iteration.extend(
                                 self._run_agent(
@@ -120,8 +124,8 @@ class ResearchService:
                     db,
                     research.id,
                     "validator",
-                    lambda: self.validator.filter_sources(
-                        source_payloads_preview,
+                    lambda preview=source_payloads_preview: self.validator.filter_sources(
+                        preview,
                         allow_domains=allow_domains,
                         deny_domains=deny_domains,
                     ),
@@ -186,7 +190,12 @@ class ResearchService:
 
             validating_started = perf_counter()
             self.tool_registry.ensure_stage_allowed(role, "validating")
-            self._start_stage(db, research, "validating", "Scoring sources and checking consistency")
+            self._start_stage(
+                db,
+                research,
+                "validating",
+                "Scoring sources and checking consistency",
+            )
             validated_sources = self._run_agent(
                 db,
                 research.id,
@@ -217,7 +226,9 @@ class ResearchService:
             source_rows: list[Source] = []
             pii_redactions_total = 0
             for source_payload in validated_sources:
-                redacted_content, redaction_stats = self.pii_redactor.redact(str(source_payload["content"]))
+                redacted_content, redaction_stats = self.pii_redactor.redact(
+                    str(source_payload["content"])
+                )
                 pii_redactions_total += redaction_stats["total"]
                 content_chunk = redacted_content[:500]
                 row = Source(
