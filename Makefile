@@ -1,4 +1,4 @@
-.PHONY: backend-install frontend-install lint test
+.PHONY: backend-install frontend-install lint test smoke
 
 backend-install:
 	cd backend && pip install -e .[dev]
@@ -13,4 +13,11 @@ lint:
 
 test:
 	cd backend && pytest
+	cd frontend && npm run build
+
+smoke:
+	cd backend && ruff check app tests
+	cd backend && pytest -q
+	cd frontend && npm run lint
+	cd frontend && npm run format:check
 	cd frontend && npm run build
