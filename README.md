@@ -5,7 +5,7 @@ Autonomous AI research agent monorepo with a FastAPI backend and React frontend.
 ## Repository structure
 - `/backend` - FastAPI API, research pipeline, models, auth, and tests
 - `/frontend` - React + Vite + Tailwind UI
-- `/docs` - architecture notes
+- `/docs` - architecture notes, runbook, and demo script
 
 ## MVP capabilities
 ### Backend API
@@ -59,6 +59,17 @@ Autonomous AI research agent monorepo with a FastAPI backend and React frontend.
 ### Backend
 ```bash
 cd backend
+cp .env.example .env
+PYENV_VERSION=3.11.14 python -m pip install -e .[dev]
+PYENV_VERSION=3.11.14 python -m uvicorn app.main:app --reload
+```
+
+> Prefer Python 3.11+ for local development (CI runs on 3.11).
+
+### Backend (without pyenv)
+```bash
+cd backend
+cp .env.example .env
 pip install -e .[dev]
 uvicorn app.main:app --reload
 ```
@@ -66,6 +77,7 @@ uvicorn app.main:app --reload
 ### Frontend
 ```bash
 cd frontend
+cp .env.example .env
 npm install
 npm run dev
 ```
@@ -75,8 +87,32 @@ npm run dev
 docker-compose up --build
 ```
 
+Once running:
+- Frontend: http://localhost:5173
+- Backend docs: http://localhost:8000/docs
+
+## 15-minute demo flow
+1. Open `http://localhost:5173`.
+2. Sign in with any email/password (local demo auth auto-provisions a user).
+3. Open **Research Query** and run one of the built-in demo prompts.
+4. In **Research Results**, review:
+   - Findings with confidence rationale
+   - Evidence table filters and contradiction panel
+   - Execution timeline (state + latency)
+5. Open **Source Viewer** from citations and inspect source metadata.
+6. Export Markdown and JSON reports for portfolio walkthrough material.
+
+For a scriptable walkthrough, see `docs/demo-script.md`.
+For troubleshooting and operational checks, see `docs/runbook.md`.
+
 ## Quality checks
 ```bash
 make lint
 make test
+make smoke
 ```
+
+## CI and delivery readiness
+- GitHub Actions CI runs backend lint/tests and frontend lint/format/build.
+- Docker Compose now includes health checks for postgres/backend and ordered startup.
+- Report contract regression test guards structured-report trust fields.
