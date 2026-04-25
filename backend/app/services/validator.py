@@ -105,7 +105,12 @@ class ValidationLayer:
         findings: list[dict[str, object]],
     ) -> dict[str, object]:
         if not findings:
-            return {"supported_claims": 0, "total_claims": 0, "score": 0.0, "unsupported_claims": []}
+            return {
+                "supported_claims": 0,
+                "total_claims": 0,
+                "score": 0.0,
+                "unsupported_claims": [],
+            }
         unsupported_claims = [
             str(finding.get("claim", ""))
             for finding in findings

@@ -1,8 +1,8 @@
 # Contributing
 
 ## Local setup
-- Backend: `cd backend && pip install -e .[dev]`
-- Frontend: `cd frontend && npm install`
+- Backend: `cd backend && cp .env.example .env && pip install -e .[dev]`
+- Frontend: `cd frontend && cp .env.example .env && npm install`
 - Full stack: `docker-compose up --build`
 
 ## Quality checks

@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import Base, engine, get_db
 from app.models import (
-    AuditLog,
     AgentRunMetric,
+    AuditLog,
     Citation,
     Memory,
     ResearchSession,
@@ -20,16 +20,16 @@ from app.models import (
     Workspace,
 )
 from app.schemas import (
-    AuditLogRead,
     AgentMetricRead,
+    AuditLogRead,
     LoginRequest,
     MemoryRead,
-    ResearchCreate,
     ResearchComplianceRead,
+    ResearchCreate,
     ResearchDetail,
     ResearchMetricsRead,
-    ResearchReplayRead,
     ResearchRead,
+    ResearchReplayRead,
     ResearchResult,
     ResearchTraceRead,
     SourceRead,
@@ -52,6 +52,8 @@ app.state.research_service = ResearchService()
 @app.on_event("startup")
 def startup() -> None:
     Base.metadata.create_all(bind=engine)
+    if settings.jwt_secret == "change-me":
+        print("WARNING: ASTRA_JWT_SECRET is using the default insecure value.")
 
 
 @app.get("/health")
@@ -151,7 +153,14 @@ def retry_research(
         parent_session_id=previous.id,
         version=previous.version + 1,
     )
-    _log_audit(db, user, "research.retry", "research_session", research.id, f"Retry from {research_id}")
+    _log_audit(
+        db,
+        user,
+        "research.retry",
+        "research_session",
+        research.id,
+        f"Retry from {research_id}",
+    )
     report = json.loads(summary.structured_report) if summary.structured_report else {}
     return ResearchResult(
         research_id=research.id,

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from app.models import AgentRunMetric, ResearchSession, ResearchTraceEvent
@@ -40,7 +40,7 @@ def test_stage_latency_uses_completed_events_only_and_keeps_max_per_stage() -> N
 
 def test_replay_sorts_timeline_and_deduplicates_error_categories() -> None:
     service = ResearchService()
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     research = ResearchSession(id=42, user_id=1, query="q", status="failed")
     events = [
         ResearchTraceEvent(
