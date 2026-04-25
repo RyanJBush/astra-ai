@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BrowserRouter, Link, Route, Routes, useNavigate, useParams } from 'react-router-dom'
+import {
+  BrowserRouter,
+  Link,
+  Route,
+  Routes,
+  useNavigate,
+  useParams,
+} from 'react-router-dom'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
 
@@ -92,7 +99,9 @@ function LoginPage() {
     <Layout>
       <div className="mx-auto mt-12 max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h1 className="text-2xl font-semibold">Login</h1>
-        <p className="mt-2 text-sm text-slate-600">Sign in to run research sessions.</p>
+        <p className="mt-2 text-sm text-slate-600">
+          Sign in to run research sessions.
+        </p>
         <form className="mt-6 space-y-4" onSubmit={submit}>
           <input
             className="w-full rounded-md border border-slate-300 p-2"
@@ -111,7 +120,10 @@ function LoginPage() {
             required
           />
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <button className="w-full rounded-md bg-slate-900 p-2 text-white" type="submit">
+          <button
+            className="w-full rounded-md bg-slate-900 p-2 text-white"
+            type="submit"
+          >
             Sign in
           </button>
         </form>
@@ -140,12 +152,18 @@ function DashboardPage() {
           >
             <div className="flex items-center justify-between">
               <p className="font-medium">{item.query}</p>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">{item.status}</span>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">
+                {item.status}
+              </span>
             </div>
-            <p className="mt-1 text-sm text-slate-500">Version: {item.version}</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Version: {item.version}
+            </p>
           </Link>
         ))}
-        {items.length === 0 && <p className="text-sm text-slate-500">No sessions yet.</p>}
+        {items.length === 0 && (
+          <p className="text-sm text-slate-500">No sessions yet.</p>
+        )}
       </div>
     </Layout>
   )
@@ -182,7 +200,9 @@ function ResearchQueryPage() {
   return (
     <Layout>
       <h1 className="text-2xl font-semibold">Research Query</h1>
-      <p className="mt-1 text-sm text-slate-600">Use demo prompts or configure search controls.</p>
+      <p className="mt-1 text-sm text-slate-600">
+        Use demo prompts or configure search controls.
+      </p>
       <div className="mt-3 flex flex-wrap gap-2">
         {DEMO_QUERIES.map((item) => (
           <button
@@ -249,7 +269,10 @@ function ResearchQueryPage() {
           </div>
         )}
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <button className="rounded-md bg-slate-900 px-5 py-2 text-white" type="submit">
+        <button
+          className="rounded-md bg-slate-900 px-5 py-2 text-white"
+          type="submit"
+        >
           Run research
         </button>
       </form>
@@ -276,9 +299,12 @@ function ResearchResultsPage() {
   }, [params.id])
 
   const exportReport = async (format) => {
-    const response = await fetch(`${API_BASE}/api/research/${params.id}/export?format=${format}`, {
-      headers: authHeaders(),
-    })
+    const response = await fetch(
+      `${API_BASE}/api/research/${params.id}/export?format=${format}`,
+      {
+        headers: authHeaders(),
+      }
+    )
     const blob = await response.blob()
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -316,7 +342,8 @@ function ResearchResultsPage() {
             <p className="font-medium">{detail.research.query}</p>
             {detail.requires_review && (
               <p className="mt-2 rounded-md bg-amber-100 p-2 text-sm text-amber-800">
-                Review required: {detail.review_reason || 'Low confidence evidence.'}
+                Review required:{' '}
+                {detail.review_reason || 'Low confidence evidence.'}
               </p>
             )}
             <pre className="mt-3 whitespace-pre-wrap rounded-md bg-slate-100 p-3 text-sm">
@@ -327,9 +354,18 @@ function ResearchResultsPage() {
           {metrics && (
             <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <MetricCard label="Sources" value={metrics.source_count} />
-              <MetricCard label="Coverage" value={metrics.evidence_coverage_score} />
-              <MetricCard label="Support ratio" value={metrics.fact_support_ratio} />
-              <MetricCard label="Contradictions" value={metrics.contradiction_rate} />
+              <MetricCard
+                label="Coverage"
+                value={metrics.evidence_coverage_score}
+              />
+              <MetricCard
+                label="Support ratio"
+                value={metrics.fact_support_ratio}
+              />
+              <MetricCard
+                label="Contradictions"
+                value={metrics.contradiction_rate}
+              />
             </section>
           )}
 
@@ -337,14 +373,21 @@ function ResearchResultsPage() {
             <h2 className="text-lg font-semibold">Findings</h2>
             <div className="mt-3 space-y-3">
               {(detail.report?.findings || []).map((finding) => (
-                <article key={finding.claim_id} className="rounded-md border border-slate-200 p-3">
+                <article
+                  key={finding.claim_id}
+                  className="rounded-md border border-slate-200 p-3"
+                >
                   <div className="flex items-center justify-between">
                     <p className="font-medium">{finding.claim}</p>
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${confidenceBadge(finding.confidence_level)}`}>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs ${confidenceBadge(finding.confidence_level)}`}
+                    >
                       {finding.confidence_level}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">Confidence: {finding.confidence}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Confidence: {finding.confidence}
+                  </p>
                 </article>
               ))}
             </div>
@@ -355,12 +398,21 @@ function ResearchResultsPage() {
               <h2 className="text-lg font-semibold">Evidence table</h2>
               <ul className="mt-3 space-y-2 text-sm">
                 {(detail.report?.evidence_table || []).map((source) => (
-                  <li key={source.source_id} className="rounded border border-slate-200 p-2">
-                    <a className="font-medium text-blue-600" href={source.url} target="_blank" rel="noreferrer">
+                  <li
+                    key={source.source_id}
+                    className="rounded border border-slate-200 p-2"
+                  >
+                    <a
+                      className="font-medium text-blue-600"
+                      href={source.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       {source.title}
                     </a>
                     <p className="text-xs text-slate-500">
-                      {source.source_type} • credibility {source.credibility_score}
+                      {source.source_type} • credibility{' '}
+                      {source.credibility_score}
                     </p>
                   </li>
                 ))}
@@ -370,11 +422,18 @@ function ResearchResultsPage() {
               <h2 className="text-lg font-semibold">Contradictions</h2>
               <ul className="mt-3 space-y-2 text-sm">
                 {(detail.report?.contradictions || []).length === 0 && (
-                  <li className="text-slate-500">No contradictions detected.</li>
+                  <li className="text-slate-500">
+                    No contradictions detected.
+                  </li>
                 )}
                 {(detail.report?.contradictions || []).map((item) => (
-                  <li key={`${item.claim_a}-${item.claim_b}`} className="rounded border border-rose-200 bg-rose-50 p-2">
-                    <p className="font-medium">{item.claim_a} vs {item.claim_b}</p>
+                  <li
+                    key={`${item.claim_a}-${item.claim_b}`}
+                    className="rounded border border-rose-200 bg-rose-50 p-2"
+                  >
+                    <p className="font-medium">
+                      {item.claim_a} vs {item.claim_b}
+                    </p>
                     <p className="text-xs text-slate-600">{item.reason}</p>
                   </li>
                 ))}
@@ -386,10 +445,15 @@ function ResearchResultsPage() {
             <h2 className="text-lg font-semibold">Live execution timeline</h2>
             <ul className="mt-3 space-y-2 text-sm">
               {trace.map((event, index) => (
-                <li key={`${event.stage}-${event.created_at}-${index}`} className="rounded border border-slate-200 p-2">
+                <li
+                  key={`${event.stage}-${event.created_at}-${index}`}
+                  className="rounded border border-slate-200 p-2"
+                >
                   <div className="flex items-center justify-between">
                     <span className="font-medium">{event.stage}</span>
-                    <span className="text-xs text-slate-500">{event.state}</span>
+                    <span className="text-xs text-slate-500">
+                      {event.state}
+                    </span>
                   </div>
                   <p className="text-xs text-slate-600">{event.detail}</p>
                 </li>
@@ -402,7 +466,10 @@ function ResearchResultsPage() {
             <ul className="mt-2 space-y-2 text-sm">
               {detail.citations.map((citation) => (
                 <li key={`${citation.marker}-${citation.source_id}`}>
-                  <Link className="text-blue-600" to={`/sources/${detail.research.id}`}>
+                  <Link
+                    className="text-blue-600"
+                    to={`/sources/${detail.research.id}`}
+                  >
                     {citation.marker}
                   </Link>{' '}
                   {citation.excerpt}
@@ -438,12 +505,21 @@ function SourceViewerPage() {
       <h1 className="text-2xl font-semibold">Source Viewer</h1>
       <div className="mt-4 space-y-3">
         {sources.map((source) => (
-          <article key={source.id} className="rounded-md border border-slate-200 bg-white p-4">
-            <a className="font-medium text-blue-600" href={source.url} rel="noreferrer" target="_blank">
+          <article
+            key={source.id}
+            className="rounded-md border border-slate-200 bg-white p-4"
+          >
+            <a
+              className="font-medium text-blue-600"
+              href={source.url}
+              rel="noreferrer"
+              target="_blank"
+            >
               {source.title}
             </a>
             <p className="mt-1 text-xs text-slate-500">
-              Type: {source.source_type} • credibility: {source.credibility_score}
+              Type: {source.source_type} • credibility:{' '}
+              {source.credibility_score}
             </p>
             <p className="mt-2 text-sm text-slate-600">{source.content}</p>
           </article>
@@ -464,8 +540,12 @@ function SettingsPage() {
   return (
     <Layout>
       <h1 className="text-2xl font-semibold">Settings</h1>
-      <p className="mt-2 text-sm text-slate-600">Auth token status: {token ? 'Active' : 'Missing'}</p>
-      <p className="mt-1 text-sm text-slate-600">Workspace: {workspace?.name || 'Unavailable'}</p>
+      <p className="mt-2 text-sm text-slate-600">
+        Auth token status: {token ? 'Active' : 'Missing'}
+      </p>
+      <p className="mt-1 text-sm text-slate-600">
+        Workspace: {workspace?.name || 'Unavailable'}
+      </p>
       <button
         className="mt-4 rounded-md border border-slate-300 px-4 py-2"
         onClick={() => {

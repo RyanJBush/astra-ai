@@ -22,6 +22,8 @@ class ToolRegistry:
         required = self.STAGE_TO_TOOLS.get(stage, set())
         missing = required - allowed
         if missing:
+            missing_tools = ", ".join(sorted(missing))
             raise PermissionError(
-                f"Role '{role}' cannot execute stage '{stage}'. Missing tools: {', '.join(sorted(missing))}"
+                f"Role '{role}' cannot execute stage '{stage}'. "
+                f"Missing tools: {missing_tools}"
             )

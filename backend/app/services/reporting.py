@@ -58,8 +58,7 @@ class ReportBuilder:
         )
         disclaimer = self._disclaimer(evidence_coverage, contradiction_items)
         review_required = bool(
-            disclaimer
-            or any(finding["confidence_level"] == "low" for finding in findings)
+            disclaimer or any(finding["confidence_level"] == "low" for finding in findings)
         )
         return {
             "executive_summary": f"Automated research summary for: {query}",
@@ -108,24 +107,24 @@ class ReportBuilder:
         return "\n".join(lines)
 
     def to_markdown(self, report: dict) -> str:
-        lines = ["# Research Report", "", f"## Executive Summary", report["executive_summary"], ""]
+        lines = ["# Research Report", "", "## Executive Summary", report["executive_summary"], ""]
         lines.append("## Findings")
         for finding in report["findings"]:
             links = ", ".join(finding["source_links"]) or "No source links"
             lines.append(
-                (
-                    f"- **{finding['claim_id']}**: {finding['claim']} "
-                    f"(confidence: {finding['confidence']} / {finding['confidence_level']})  \n"
-                    f"  Sources: {links}"
-                )
+                f"- **{finding['claim_id']}**: {finding['claim']} "
+                f"(confidence: {finding['confidence']} / {finding['confidence_level']})  \n"
+                f"  Sources: {links}"
             )
         lines.append("")
         lines.append("## Contradictions")
         if report["contradictions"]:
             for contradiction in report["contradictions"]:
-                lines.append(
-                    f"- {contradiction['claim_a']} vs {contradiction['claim_b']}: {contradiction['reason']}"
+                contradiction_summary = (
+                    f"{contradiction['claim_a']} vs {contradiction['claim_b']}: "
+                    f"{contradiction['reason']}"
                 )
+                lines.append(f"- {contradiction_summary}")
         else:
             lines.append("- None detected")
         lines.append("")
@@ -203,10 +202,8 @@ class ReportBuilder:
                 questions.append(f"What primary evidence supports claim: {claim}?")
         for contradiction in contradiction_items[:2]:
             questions.append(
-                (
-                    f"Why do sources disagree on '{contradiction['claim_a']}' "
-                    f"and '{contradiction['claim_b']}'?"
-                )
+                f"Why do sources disagree on '{contradiction['claim_a']}' "
+                f"and '{contradiction['claim_b']}'?"
             )
         if not questions:
             questions.append("Which additional primary sources could increase confidence?")
@@ -220,5 +217,7 @@ class ReportBuilder:
         if contradiction_items:
             return "Conflicting evidence detected; conclusions should be treated as provisional."
         if float(evidence_coverage.get("score", 0.0)) < 0.6:
-            return "Limited evidence coverage; more sources are required before relying on findings."
+            return (
+                "Limited evidence coverage; more sources are required before relying on findings."
+            )
         return None

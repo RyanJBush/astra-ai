@@ -1,6 +1,6 @@
 from app.models import Citation, Source
-from app.services.planner import PlannerAgent
 from app.services.pii_redactor import PIIRedactor
+from app.services.planner import PlannerAgent
 from app.services.reporting import ReportBuilder
 from app.services.validator import ValidationLayer
 
